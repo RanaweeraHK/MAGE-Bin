@@ -1,0 +1,51 @@
+{
+  "coconet": {
+    "method": "CoCoNet",
+    "method_class": "viral_binner",
+    "version_command": ["/home/hashini/miniforge3/envs/coconet_env/bin/coconet", "--version"],
+    "hard_minimum_bp": 2048,
+    "notes": "Virus-specific composition and per-base multi-sample coverage binner. Its hard >2048-bp filter is retained and rejected cohort contigs count as unassigned."
+  },
+  "vrhyme": {
+    "method": "vRhyme",
+    "method_class": "viral_binner",
+    "version_command": ["/home/hashini/miniforge3/envs/vrhyme_env/bin/vRhyme", "--version"],
+    "hard_minimum_bp": 2000,
+    "notes": "Virus-specific binner using coverage, composition and protein redundancy; no universal single-copy marker genes. BAM input is restricted to mapped primary alignments (-F 2308), avoiding vRhyme 1.1.0's zero-query-length error on hard-clipped long-read secondary/supplementary records."
+  },
+  "vamb": {
+    "method": "VAMB",
+    "method_class": "marker_free_metagenomic_binner",
+    "version_command": ["/home/hashini/miniforge3/envs/vamb_env/bin/vamb", "--version"],
+    "hard_minimum_bp": 2000,
+    "notes": "VAMB core composition/abundance binning only; TaxVAMB and marker-gene reclustering are not used."
+  },
+  "cocobin": {
+    "method": "CoCoBin",
+    "method_class": "marker_free_metagenomic_binner",
+    "version_command": ["/usr/bin/bash", "/home/hashini/Viralbinning/Other_Tools/tools/cocobin.sh", "--version"],
+    "hard_minimum_bp": 1000,
+    "notes": "CoCoBin public preprint implementation at pinned commit 594fed94cdf3fd2d9e1420eb8c667f3f9eed32ca; canonical 4-mer composition, mean multi-sample abundance and Louvain graph clustering; deterministic aliases satisfy its documented header convention and are mapped back before scoring; validated runtime numpy 2.4.6, pandas 3.0.3, networkx 3.6.1, Biopython 1.87 and scikit-learn 1.9.0; no single-copy-marker-gene stage."
+  },
+  "clmb": {
+    "method": "CLMB",
+    "method_class": "marker_free_metagenomic_binner",
+    "version_command": ["/usr/bin/bash", "/home/hashini/Viralbinning/Other_Tools/tools/clmb.sh", "--version"],
+    "hard_minimum_bp": 2000,
+    "notes": "CLMB public RECOMB 2022 implementation at pinned commit a92838924d8731769cc83a9bb436ee03a0fd79b6; contrastive VAE composition/abundance core invoked with --contrastive and published defaults; no marker-gene refinement."
+  },
+  "metabat2": {
+    "method": "MetaBAT2",
+    "method_class": "marker_free_metagenomic_binner",
+    "version_command": ["/home/hashini/miniforge3/envs/metabat2_env/bin/metabat2", "--help"],
+    "hard_minimum_bp": 1500,
+    "notes": "Composition/abundance core binner, configured with -m 2000."
+  },
+  "concoct": {
+    "method": "CONCOCT",
+    "method_class": "marker_free_metagenomic_binner",
+    "version_command": ["/home/hashini/miniforge3/envs/concoct_env/bin/concoct", "--version"],
+    "hard_minimum_bp": 1000,
+    "notes": "Composition/coverage binner, configured with -l 2000."
+  }
+}

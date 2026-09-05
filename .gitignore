@@ -1,0 +1,13 @@
+# Data and results are far too large for GitHub (Data/ 59G, Outputs/ 64G).
+Data/
+Outputs/*
+!Outputs/comparison_real.csv
+!Outputs/comparison_simulated.csv
+!Outputs/plots/
+*.lock
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/

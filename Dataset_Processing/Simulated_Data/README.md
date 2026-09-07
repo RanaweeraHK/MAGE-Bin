@@ -222,32 +222,3 @@ Ground truth (`strain_map.tsv`) stays in the tier's `genome_pool/`, which is
 where the notebooks read it from; it is not copied into the dataset
 directory.
 
-## Tool dependencies
-
-`0_check_environment.sh` checks all of these and prints an install command
-for anything missing. `iss` (system), `mmseqs` + `python` w/
-torch/PyG/pysam/pyrodigal-gv/sklearn (`viralbin` conda env), and
-`metaspades.py`/`minimap2`/`samtools`/`seqkit` (`asm_env` conda env, see
-below) are expected.
-
-`metaspades.py`/`minimap2`/`samtools`/`seqkit` live in their **own** env
-(`asm_env`), not inside `viralbin`: bioconda's current `samtools`/`htslib`
-builds need a newer `openssl`/`libdeflate` than what's already pinned inside
-`viralbin` (by its `torch`/PyG stack), so `conda install -n viralbin ...`
-fails to solve. A clean env has no such pins and resolves in seconds:
-
-```bash
-mamba create -n asm_env -c bioconda -c conda-forge \
-  "spades>=3.15" "minimap2>=2.24" "samtools>=1.17" "seqkit>=2.5"
-```
-
-`setup_environments.sh` builds it, and `VB_ASM_CONDA_BIN` in `../env.sh`
-points at it.
-`5_assemble_and_build_graph.py` prepends it to `PATH` at import time, and its
-`Toolbox.resolve()` falls back from `--conda-bin` to `PATH` (trying both
-`name` and `name.py` either way), so the second env is picked up
-automatically.
-
-Phases 0–3 need nothing beyond the Python standard library and already run
-against the real raw data (verified — see provenance table above).
-

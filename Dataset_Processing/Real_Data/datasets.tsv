@@ -1,0 +1,76 @@
+# Real sequencing datasets to process.  ONE dataset per row; edit this file to
+# add or remove datasets, then run `bash run_all.sh`.
+#
+# This is the only shared file in the pipeline (the simulated pipeline keeps its
+# per-tier constants inside each script instead).  A dataset here is a LIST OF
+# SRA RUNS or a PRE-BUILT ASSEMBLY, and repeating that across four scripts would
+# drift the moment one is added, so the registry is data rather than four copies
+# of a constant.  Every script reads it with a dozen lines of stdlib parsing and
+# still runs standalone.
+#
+# Use `-` for any column that does not apply.  Never leave a cell empty: the
+# shell scripts read columns positionally and a trailing empty field is lost.
+#
+# Columns
+#   dataset         directory-safe name; becomes Data/work/real_<dataset>/ and
+#                   the <dataset>__coasm__... run name.
+#   study           subdirectory under Data/Real_dataset/ holding the SRA cache
+#                   (source=sra) or the assembly (source=assembly).
+#   accessions      comma-separated SRA run accessions. Each becomes ONE sample,
+#                   i.e. one coverage column - so this list is the differential
+#                   coverage signal the binner gets. Fewer than 3 is thin. For
+#                   source=assembly this is PROVENANCE ONLY: the runs whose
+#                   coverage was adopted, recorded so the dataset can be traced.
+#   read_type       short | long.  Decides assembler and minimap2 preset:
+#                   short -> metaspades + `-x sr`, long -> metaflye + `-x map-ont`.
+#                   Same rule the simulated pipeline applies; a real dataset has
+#                   no read simulator, so read_type comes from the run metadata
+#                   (SRA "Platform"/"LibraryLayout") rather than from badread/iss.
+#                   For source=assembly it records which assembler produced it.
+#   viral_enriched  yes | no.  `yes` = the library is already a virome (VLP/TFF
+#                   enriched), so every assembled contig is taken as viral and NO
+#                   viral-identification tool runs -> run name ends `__noviral`.
+#                   `no` = bulk metagenome, so geNomad runs (or its saved calls
+#                   are adopted) and only its viral calls are kept -> `__genomad`.
+#   source          sra | assembly.
+#                     sra      - phase 1 downloads the runs and phase 2 assembles
+#                                them. The normal path.
+#                     assembly - the assembly already exists; phase 1 imports it
+#                                into the work directory and phase 2 skips
+#                                straight to the graph. Nothing is re-assembled.
+#   assembly_dir    source=assembly only: directory holding the assembly, either
+#                   absolute or relative to Data/Real_dataset/. Must contain a
+#                   contigs FASTA, a GFA and the assembler's path table
+#                   (metaSPAdes: contigs.fasta, assembly_graph_with_scaffolds.gfa
+#                   or assembly_graph.gfa, contigs.paths).
+#   import_from     optional: a previous run's work directory whose finished
+#                   artifacts are adopted into this dataset's work directory
+#                   rather than recomputed - `coverage.csv`, the length/viral
+#                   filtered `contigs_filt.fasta`, and a geNomad output tree
+#                   (`viral/genomad/`). Use `-` to compute everything fresh.
+#                   Adopted stages are printed as [adopted] by phase 2, and what
+#                   was taken is recorded in the dataset's manifest.json.
+#   assembler       optional, source=assembly only. `-` derives it from
+#                   read_type (short -> metaspades, long -> metaflye), which is
+#                   right when the pipeline assembles. For a PRE-BUILT assembly
+#                   the two are independent: the assembly's format is fixed by
+#                   whoever produced it, while read_type describes the reads
+#                   being mapped for coverage and therefore only picks the
+#                   minimap2 preset. Set it when they disagree - e.g. a metaFlye
+#                   assembly whose source runs are Illumina.
+#   mean_read_length  optional. Normally MEASURED from the FASTQs by phase 2, so
+#                   leave it `-`. A pre-built assembly carries no reads to
+#                   measure, and the model turns depth back into a read count
+#                   with it (reads ~= depth * length / mean_read_length), so an
+#                   absent value silently falls back to 126 bp. Set it from the
+#                   SRA runs' reported average when the reads are gone.
+#   notes           free text, recorded in the dataset manifest.
+#
+dataset	study	accessions	read_type	viral_enriched	source	assembly_dir	import_from	assembler	mean_read_length	notes
+aloha_illumina	ALOHA	SRR8811962,SRR8811963,SRR10378148	short	yes	sra	-	-	-	-	Station ALOHA (HOT/SCOPE, DeLong Lab) viral TFF metagenomes, Illumina NextSeq 500 paired-end; BioProject PRJNA529454 / SRP189859, the dataset CoCoNet used.
+aloha_nanopore	ALOHA	SRR8811960,SRR8811961,SRR8811964,SRR10881655,SRR10378147	long	yes	sra	-	-	-	-	Station ALOHA viral TFF metagenomes, ONT GridION single-end; BioProject PRJNA529454, same study as aloha_illumina.
+lake_water	Lake_water_metaSPAdes	SRR15557808,SRR15557809,SRR15557810,SRR15557811,SRR15557812,SRR15557813	short	no	assembly	Lake_water_metaSPAdes	/home/hashini/viralbin-work/lake_water_phables__coasm__metaspades__genomad	-	297.7	Lake water metagenome, metaSPAdes assembly as distributed with Phables (344,873 contigs). Bulk metagenome, so geNomad calls define the viral set; the saved geNomad run and the 6-sample coverage matrix are adopted from the earlier build rather than recomputed - the reads themselves are no longer on disk. Read length is the SRA-reported average for the 6 runs (595.3 bp per paired spot, 297.7 per read; Illumina HiSeq 2500), not a measurement.
+lake_water_megahit	Lake_water_MEGAHIT	SRR15557808,SRR15557809,SRR15557810,SRR15557811,SRR15557812,SRR15557813	short	no	assembly	Lake_water_MEGAHIT	-	megahit	-	Lake water metagenome, MEGAHIT assembly as distributed with Phables (1,200,868 contigs). SAME six runs and same community as the lake_water row - only the assembler differs, which makes the pair a controlled test of how much the assembly graph matters. Bulk metagenome, so geNomad defines the viral set; nothing is adopted from the metaSPAdes build because every artifact there is keyed to metaSPAdes contigs. Reads were RECOVERED from that build's surviving BAMs (minimap2 -ax sr piped to samtools sort, no -F filter, so unmapped reads were retained) rather than re-downloaded. The distributed GFA names segments NODE_n_length_.., sharing nothing with the k141_n contig names, which would silently produce a zero-edge graph; rename_megahit_gfa.py rewrote them by exact sequence - 1,200,868/1,200,868 matched, all 850,422 links kept. The original is preserved as final.contigs.NODE-names.gfa.
+ibd	IBD	ERR844046,ERR844067,ERR844002,ERR843962,ERR844047,ERR843959,ERR843964,ERR844068,ERR844041,ERR844003,ERR844058,ERR843926	short	no	assembly	IBD	-	metaflye	-	IBD gut virome, Norman et al. 2015 (WashU), BioProject PRJEB7772. Hecatomb population assembly as distributed with Phables: MEGAHIT per sample merged with Flye --subassemblies, so the layout is metaFlye (assembly_info.txt carries graph_path) while the reads are Illumina MiSeq - read_type=short picks minimap2 -x sr, assembler=metaflye describes the file format. 12 of the study's 171 WGS runs are used, the deepest available (13.1 Gbp): coverage needs SAMPLES not exhaustive depth, and 12 columns is double lake_water's 6, while all 171 would be 101.6 Gbp. The 167 AMPLICON runs are excluded. 95.8% of contigs span >1 graph edge (mean 3.01), so oriented path projection has real material - unlike wastewater, where 22,025/22,035 contigs mapped to one segment and only 10 edges survived.
+wastewater	Wastewater	SRR6872420,SRR6872421,SRR6872422,SRR6872423,SRR6872424,SRR6872425,SRR6872426,SRR6872427,SRR6872428,SRR6872429,SRR6872430,SRR6872431,SRR6872432,SRR6872433,SRR6872434,SRR6872435,SRR6872436,SRR6872437	short	no	assembly	Wastewater	-	metaflye	202	Wastewater virome (U.S. EPA), BioProject PRJNA434744: 18 Illumina MiSeq WGA/MDA runs, 9.4 Gbp, a dilution series (WW_1-100 .. WW_1-100000). Flye-formatted assembly from short reads for the same Hecatomb reason as ibd: MEGAHIT per sample, Flye --subassemblies to merge. read_type=short. Read length is the SRA-reported average (202 bp) for the 18 runs, declared rather than measured, because phase 2 adopted the coverage matrix instead of re-detecting the reads; without it the model defaults to 126 bp and overstates read counts ~1.6x.
+soil	Soil	SRR20958178,SRR20958179,SRR20958180,SRR20958181,SRR20958182,SRR20958183,SRR20958190,SRR20958201,SRR20958210,SRR20958211,SRR20958212,SRR20958213	short	no	assembly	Soil	-	metaflye	-	Paddy soil virome, Hunan Province China, BioProject PRJNA866269, as distributed with Phables. Hecatomb population assembly (MEGAHIT per sample, merged with Flye --subassemblies), so metaFlye layout with Illumina reads - same arrangement as ibd and wastewater. Only the 12 NovaSeq metagenome runs are used; the other 24 runs in the project are <60 Mbp each and are not metagenomes. Those 12 total 128 Gbp, so reads are fetched PARTIALLY (fastq-dump -X 3000000, ~0.9 Gbp per sample) - coverage needs relative abundance across samples, not depth, and the cohort is only 395 Mbp. CAUTION: the distributed GFA has 2,226 links over 249,193 segments (0.009 links/segment), lower even than wastewater, so the projected contig graph is expected to be near-empty despite 99.3% of contigs carrying a multi-edge graph_path. Kept as a composition/coverage benchmark and as a robustness test for graph-dependent methods.

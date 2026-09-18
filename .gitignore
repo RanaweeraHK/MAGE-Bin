@@ -11,3 +11,13 @@ __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
 .venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Machine-specific pipeline settings (copied from env.sh.example, per user).
+env.sh

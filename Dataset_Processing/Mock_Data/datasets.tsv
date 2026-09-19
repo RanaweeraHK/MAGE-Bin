@@ -1,0 +1,32 @@
+# Viral mock communities: real sequencing reads, known composition.
+# One dataset per row. Edit this file, then run `bash run_all.sh`.
+# Use `-` for any column that does not apply; never leave a cell empty.
+#
+# The first ten columns are the same, in the same order, as
+# ../Real_Data/datasets.tsv, because phase 2 IS that pipeline's phase 2.
+#   dataset          name; becomes Data/work/mock_<dataset>/ and the run name
+#   study            subdirectory under Data/Mock_dataset/
+#   accessions       the libraries, one coverage column each
+#   read_type        short -> metaspades + `-x sr`; long -> metaflye + `-x map-ont`
+#   viral_enriched   yes -> every contig is viral, no geNomad
+#   source           always `sra` here: phase 1 leaves reads in the work directory
+#   assembly_dir     unused
+#   import_from      unused
+#   assembler        megahit for the short rows; `-` would derive
+#                    metaspades/metaflye from read_type
+#   mean_read_length `-` -> phase 2 measures it
+#   notes            recorded in the dataset manifest
+#
+# Mock-only columns
+#   provider         ena (FASTQ off the ENA mirror) | dataverse (INRAE, by DOI)
+#   source_id        the study accession or dataset DOI
+#   reads_format     fastq | fasta (fasta is converted in phase 1)
+#   reference_set    the reference bundle phase 3 labels contigs against
+#
+# See README.md for what each dataset is and what it tests.
+
+dataset	study	accessions	read_type	viral_enriched	source	assembly_dir	import_from	assembler	mean_read_length	notes	provider	source_id	reads_format	reference_set
+dsmz_dsrna	DSMZ_viral_mock	dsRNA-P5-1.fa,dsRNA-P5-2.fa,dsRNA-P5-3.fa,dsRNA-P5-4.fa,dsRNA-P5-5.fa,dsRNA-P5-6.fa,dsRNA-P5-7.fa,dsRNA-P5-8.fa,dsRNA-P5-9.fa,dsRNA-P5-10.fa,dsRNA-P5-11.fa,dsRNA-P5-12.fa,dsRNA-P10-1.fa,dsRNA-P10-2.fa,dsRNA-P10-3.fa,dsRNA-P10-4.fa,dsRNA-P10-5.fa,dsRNA-P10-6.fa,dsRNA-P20-1.fa,dsRNA-P20-2.fa,dsRNA-P20-3.fa,dsRNA-P60.fa	short	yes	sra	-	-	megahit	-	DSMZ/INRAE plant-virus synthetic community, dsRNA protocol (J Virol 2023, 10.1128/jvi.01300-23). 22 libraries over nested sub-communities (12x 5-virus, 6x 10-virus, 3x 20-virus, 1x 60-virus) from one pool of 115 reference molecules in 68 agents, so the coverage columns carry real presence/absence structure and the truth asks for multipartite segments to be co-binned.	dataverse	doi:10.57745/EMM5EQ	fasta	dsmz_115_molecules
+dsmz_vana	DSMZ_viral_mock	VANA-P5-1.fa,VANA-P5-2.fa,VANA-P5-3.fa,VANA-P5-4.fa,VANA-P5-5.fa,VANA-P5-6.fa,VANA-P5-7.fa,VANA-P5-8.fa,VANA-P5-9.fa,VANA-P5-10.fa,VANA-P5-11.fa,VANA-P5-12.fa,VANA-P10-1.fa,VANA-P10-2.fa,VANA-P10-3.fa,VANA-P10-4.fa,VANA-P10-5.fa,VANA-P10-6.fa,VANA-P20-1.fa,VANA-P20-2.fa,VANA-P20-3.fa,VANA-P60.fa	short	yes	sra	-	-	megahit	-	Same 22 sub-communities and reference set as dsmz_dsrna, VANA protocol (virion-associated nucleic acids) instead of purified dsRNA. VANA sees DNA viruses that dsRNA misses and covers the RNA virome less completely.	dataverse	doi:10.57745/EMM5EQ	fasta	dsmz_115_molecules
+phage_mock_illumina	phage_mock_15	ERR10359653,ERR10359656,ERR10359658	short	yes	sra	-	-	megahit	-	15-phage mock community, Illumina MiSeq (Microb Genom 2024, 10.1099/mgen.0.001198; ENA PRJEB56639). Genomes 44.5-320 kb, 28-61% GC, copy numbers over four orders of magnitude, and a microdiversity cluster (J1/J2 100% identical, SLUR29/SWAN 87%). All three runs sequence the same community, so the coverage columns are replicates and carry little differential signal.	ena	PRJEB56639	fastq	phage_mock_15
+phage_mock_nanopore	phage_mock_15	ERR10359664,ERR10359840,ERR10359844,ERR12141278,ERR12409298,ERR12409299,ERR12409300	long	yes	sra	-	-	-	-	Same community and reference set as phage_mock_illumina, Oxford Nanopore MinION: 4 original runs plus 3 re-basecalled (ONT1/2/3_v2). ERR12141278 is much smaller (116 Mbp) and is kept as a low-depth column. The study's 3 PacBio Sequel runs are not registered - they are CLR and need --pacbio-raw, not the --nano-hq this pipeline uses.	ena	PRJEB56639	fastq	phage_mock_15

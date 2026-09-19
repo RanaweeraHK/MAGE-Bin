@@ -26,6 +26,9 @@ magebin --version
 magebin doctor
 ```
 
+For the `magebin run` changes on the GitHub main branch before the next PyPI
+release, install this checkout with `python -m pip install -e .`.
+
 ### PyTorch
 
 MAGE-Bin uses PyTorch and PyTorch Geometric. The standard installation above
@@ -36,9 +39,30 @@ PyTorch build for your system before installing MAGE-Bin.
 
 ## Quick start
 
-MAGE-Bin operates on a model-ready dataset directory.
+Run MAGE-Bin on assembled contigs, per-contig coverage, and a GFA assembly graph:
 
-A basic run is:
+```bash
+magebin run \
+    --contigs contigs.fasta \
+    --coverage coverage.tsv \
+    --graph assembly_graph.gfa \
+    --output results/
+```
+
+The GFA is required and must contain links that map to retained FASTA contigs.
+When its segment IDs differ from the FASTA contig IDs,
+provide a GFA `P` path for each contig or pass SPAdes' `contigs.paths` using
+`--paths contigs.paths`. A `contigs.paths` beside the FASTA or GFA is found
+automatically. MAGE-Bin writes prepared features in
+`results/preprocessed/`, then writes assignments and run metadata in `results/`.
+The prepared directory contains the files MAGE-Bin needs for inference, in the
+same format as those files under `Data/Processed_data/`; the research pipeline's
+extra benchmark and protein feature files are outside this command's input contract.
+The FASTA may also be gzipped. Coverage may be tab or comma separated and must
+have a `contig` column plus at least one numeric sample column; every retained
+FASTA contig needs a nonnegative coverage row.
+
+For an already prepared, model-ready dataset directory, use the existing command:
 
 ```bash
 magebin bin /path/to/dataset \
@@ -57,12 +81,12 @@ magebin bin /path/to/dataset \
 Run the following command to see all available options:
 
 ```bash
-magebin bin --help
+magebin run --help
 ```
 
-## Input
+## Prepared dataset input
 
-MAGE-Bin currently expects a preprocessed, model-ready dataset directory.
+The `magebin bin` command accepts a preprocessed, model-ready dataset directory.
 
 The directory must contain:
 
@@ -93,18 +117,21 @@ magebin bin /path/to/dataset \
 When `--coverage` is not provided, MAGE-Bin searches for coverage information
 using the dataset configuration.
 
-The preprocessing workflow used to construct model-ready datasets is available
-in the `Dataset_Processing/` directory of the GitHub repository.
-
-> **Current limitation:** this version does not yet take raw FASTA and read
-> files directly through the `magebin bin` command. Input must first be
-> converted to the model-ready dataset format.
+The benchmark preprocessing workflow is available in the `Dataset_Processing/`
+directory of the GitHub repository. `magebin run` provides the user-facing
+conversion from assembled contigs, coverage, and GFA to this format. It does
+not assemble raw sequencing reads or calculate coverage from them.
 
 ## Output
 
 MAGE-Bin writes its results to the directory specified with `--output`.
 
 The main outputs are:
+
+### `bins/`
+
+Contains one FASTA file per predicted bin, with the original contig sequences
+kept as separate FASTA records.
 
 ### `assignments.tsv`
 
@@ -198,6 +225,19 @@ This reports the installed Python dependencies and the availability of optional
 external tools.
 
 ## Development
+
+### Source layout
+
+The processing modules are numbered in dependency order. `00_config.py`
+holds shared configuration. The
+`src/magebin/preprocessing/` package contains stages `1_` through `4_`
+for contigs, coverage, GFA projection, and dataset assembly. The main package
+contains `05_dataset.py` through `11_pipeline.py` for loading, evidence,
+graph construction, training, completeness checks, clustering, and pipeline
+orchestration. `12_metrics.py` contains evaluation helpers, and `13_cli.py`
+provides the command-line implementation. Established import paths such as
+`magebin.dataset` are registered lazily by `magebin/__init__.py`; they do not
+need duplicate source files.
 
 Clone the repository:
 

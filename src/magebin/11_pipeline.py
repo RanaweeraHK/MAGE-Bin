@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .clustering import cluster_unknown_number_of_bins
-from .completeness import detect_complete_contigs
+from .completeness import detect_complete_contigs, read_fasta
 from .config import MageBinConfig
 from .dataset import load_binning_dataset
 from .graph import filter_supported_assembly_edges, load_assembly_edges
@@ -27,6 +27,7 @@ class BinningResult:
     contig_count: int
     bin_count: int
     singleton_count: int
+    bin_fasta_directory: Path | None = None
 
 
 def _json_default(value: object) -> object:
@@ -37,6 +38,38 @@ def _json_default(value: object) -> object:
     if isinstance(value, np.ndarray):
         return value.tolist()
     raise TypeError(f"cannot serialize {type(value).__name__}")
+
+
+def _write_bin_fastas(
+    fasta: str | Path, output: Path, contig_ids: list[str], labels: np.ndarray
+) -> Path:
+    """Write one FASTA per predicted bin using the original contig sequences."""
+
+    source = Path(fasta).expanduser()
+    if not source.is_file():
+        raise FileNotFoundError(f"source contig FASTA not found: {source}")
+    bins = output / "bins"
+    bins.mkdir(parents=True, exist_ok=True)
+    for previous in bins.glob("MAGE-Bin_*.fasta"):
+        previous.unlink()
+    assignments = dict(zip(contig_ids, labels, strict=True))
+    found: set[str] = set()
+    for name, sequence in read_fasta(source):
+        label = assignments.get(name)
+        if label is None:
+            continue
+        found.add(name)
+        with (bins / f"MAGE-Bin_{int(label):06d}.fasta").open("a") as handle:
+            handle.write(f">{name}\n")
+            for start in range(0, len(sequence), 80):
+                handle.write(sequence[start : start + 80] + "\n")
+    missing = assignments.keys() - found
+    if missing:
+        example = ", ".join(sorted(missing)[:3])
+        raise ValueError(
+            f"source FASTA is missing {len(missing)} binned contigs: {example}"
+        )
+    return bins
 
 
 def run_binning(
@@ -100,6 +133,13 @@ def run_binning(
         }
     ).to_csv(assignment_file, sep="\t", index=False)
 
+    bin_fasta_directory = None
+    source_fasta = dataset.manifest.get("combined_fasta")
+    if source_fasta and Path(source_fasta).is_file():
+        bin_fasta_directory = _write_bin_fastas(
+            source_fasta, output, dataset.contig_ids, labels
+        )
+
     metadata = {
         "tool": "MAGE-Bin",
         "dataset": dataset.name,
@@ -122,16 +162,13 @@ def run_binning(
         "clustering": clustering.statistics,
         "inference_graph": clustering.graph_statistics.to_dict(),
         "completeness_gate": (
-            {
-                key: value
-                for key, value in completeness_gate.items()
-                if key != "locked"
-            }
+            {key: value for key, value in completeness_gate.items() if key != "locked"}
             if completeness_gate is not None
             else None
         ),
         "result": {
             "bins": len(sizes),
+            "bin_fasta_directory": bin_fasta_directory,
             "singletons": int((sizes == 1).sum()),
             "multi_contig_bins": int((sizes > 1).sum()),
             "largest_bin_contigs": int(sizes.max()),
@@ -148,5 +185,5 @@ def run_binning(
         contig_count=len(dataset),
         bin_count=len(sizes),
         singleton_count=int((sizes == 1).sum()),
+        bin_fasta_directory=bin_fasta_directory,
     )
-

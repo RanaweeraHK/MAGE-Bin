@@ -19,24 +19,43 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="magebin",
         description="Masked adaptive graph-evidence binning for viral metagenomes",
     )
-    parser.add_argument("--version", action="version", version=f"MAGE-Bin {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"MAGE-Bin {__version__}"
+    )
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     bin_parser = subcommands.add_parser("bin", help="bin one processed cohort")
     bin_parser.add_argument("dataset", type=Path, help="model-ready dataset directory")
     bin_parser.add_argument("--output", "-o", type=Path, required=True)
     bin_parser.add_argument("--coverage", type=Path)
-    bin_parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    bin_parser.add_argument("--seed", type=int, default=0)
-    bin_parser.add_argument("--min-contig-length", type=int, default=2_000)
-    bin_parser.add_argument("--minimum-epochs", type=int, default=40)
-    bin_parser.add_argument("--maximum-epochs", type=int, default=100)
-    bin_parser.add_argument("--graph-update-interval", type=int, default=10)
-    bin_parser.add_argument(
-        "--no-complete-contig-gate",
-        action="store_true",
-        help="do not isolate contigs with terminal-repeat evidence",
+
+    run_parser = subcommands.add_parser(
+        "run", help="prepare contigs, coverage and assembly graph, then bin"
     )
+    run_parser.add_argument("--contigs", type=Path, required=True)
+    run_parser.add_argument("--coverage", type=Path, required=True)
+    run_parser.add_argument(
+        "--graph", type=Path, required=True, help="GFA assembly graph"
+    )
+    run_parser.add_argument(
+        "--paths", type=Path, help="SPAdes contigs.paths for segment-level GFA"
+    )
+    run_parser.add_argument("--output", "-o", type=Path, required=True)
+
+    for command_parser in (bin_parser, run_parser):
+        command_parser.add_argument(
+            "--device", choices=("auto", "cpu", "cuda"), default="auto"
+        )
+        command_parser.add_argument("--seed", type=int, default=0)
+        command_parser.add_argument("--min-contig-length", type=int, default=2_000)
+        command_parser.add_argument("--minimum-epochs", type=int, default=40)
+        command_parser.add_argument("--maximum-epochs", type=int, default=100)
+        command_parser.add_argument("--graph-update-interval", type=int, default=10)
+        command_parser.add_argument(
+            "--no-complete-contig-gate",
+            action="store_true",
+            help="do not isolate contigs with terminal-repeat evidence",
+        )
 
     doctor_parser = subcommands.add_parser(
         "doctor", help="report required Python packages and optional tools"
@@ -65,7 +84,10 @@ def _doctor(as_json: bool) -> int:
                 "available": True,
                 "version": getattr(module, "__version__", "unknown"),
             }
-        except (ImportError, OSError) as error:  # pragma: no cover - environment dependent
+        except (
+            ImportError,
+            OSError,
+        ) as error:  # pragma: no cover - environment dependent
             packages[name] = {"available": False, "error": str(error)}
             success = False
     commands = {
@@ -100,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     if arguments.command == "doctor":
         return _doctor(arguments.as_json)
-    if arguments.command == "bin":
+    if arguments.command in {"bin", "run"}:
         from .pipeline import run_binning
 
         config = replace(
@@ -112,18 +134,35 @@ def main(argv: list[str] | None = None) -> int:
             graph_update_interval=arguments.graph_update_interval,
             isolate_complete_contigs=not arguments.no_complete_contig_gate,
         )
-        result = run_binning(
-            arguments.dataset,
-            arguments.output,
-            config=config,
-            coverage_file=arguments.coverage,
-            device=arguments.device,
-        )
+        if arguments.command == "run":
+            from .preprocessing import prepare_dataset
+
+            dataset = prepare_dataset(
+                arguments.contigs,
+                arguments.coverage,
+                arguments.graph,
+                arguments.output,
+                min_contig_length=config.min_contig_length,
+                paths=arguments.paths,
+            )
+            result = run_binning(
+                dataset, arguments.output, config=config, device=arguments.device
+            )
+        else:
+            result = run_binning(
+                arguments.dataset,
+                arguments.output,
+                config=config,
+                coverage_file=arguments.coverage,
+                device=arguments.device,
+            )
         print(
             f"MAGE-Bin assigned {result.contig_count} contigs to "
             f"{result.bin_count} bins ({result.singleton_count} singletons)."
         )
         print(f"Assignments: {result.assignment_file}")
+        if result.bin_fasta_directory is not None:
+            print(f"Bin FASTAs: {result.bin_fasta_directory}")
         print(f"Run metadata: {result.run_metadata_file}")
         return 0
     parser.error(f"unknown command: {arguments.command}")

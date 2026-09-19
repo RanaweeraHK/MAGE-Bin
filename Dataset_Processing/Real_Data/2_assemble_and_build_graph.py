@@ -80,7 +80,15 @@ _load_env_sh()
 
 HERE = Path(__file__).resolve().parent
 REPO_HOME = HERE.parent.parent
-REGISTRY = HERE / "datasets.tsv"
+# The sibling Mock_Data pipeline reuses THIS script rather than copying two
+# thousand lines that would drift: it sets VB_REGISTRY to its own registry and
+# VB_WORK_PREFIX/VB_DATASET_ROOT to its own directories.  Unset, every one of
+# them resolves to exactly what this pipeline has always used.
+REGISTRY = Path(os.environ.get("VB_REGISTRY") or HERE / "datasets.tsv")
+WORK_PREFIX = os.environ.get("VB_WORK_PREFIX", "real")
+DATASET_TYPE = os.environ.get("VB_DATASET_TYPE", "real_sequencing")
+IS_MOCK = DATASET_TYPE == "mock_community"
+DATASET_ROOT = os.environ.get("VB_DATASET_ROOT", "Real_dataset")
 
 # parse datasets.tsv into python directory - VB_DATASET
 def load_registry(path: Path) -> dict[str, dict]:
@@ -148,9 +156,9 @@ MINIMAP_PRESET = {"short": "sr", "long": "map-ont"}[READ_TYPE]
 VIRAL_ID_TAG = "noviral" if VIRAL_ENRICHED else "genomad"
 RUN_NAME = f"{DATASET}__coasm__{ASSEMBLER}__{VIRAL_ID_TAG}"
 
-WORK_DIR = REPO_HOME / f"Data/work/real_{DATASET}"
+WORK_DIR = REPO_HOME / f"Data/work/{WORK_PREFIX}_{DATASET}"
 READS_DIR = WORK_DIR / "reads"
-SRA_DIR = REPO_HOME / f"Data/Real_dataset/{STUDY}"
+SRA_DIR = REPO_HOME / f"Data/{DATASET_ROOT}/{STUDY}"
 OUT_ROOT = REPO_HOME / "Data/Processed_data"
 MWORK = WORK_DIR / "standardize_work" / RUN_NAME   # scratch for this run
 MOUT = OUT_ROOT / RUN_NAME                         # final artifacts (kept)
@@ -1802,7 +1810,10 @@ def main() -> int:
     print(f"read type     : {READ_TYPE}")
     print(f"assembler     : {ASSEMBLER} (minimap2 -x {MINIMAP_PRESET})")
     print(f"viral ID      : {'none - virome library' if VIRAL_ENRICHED else f'geNomad ({GENOMAD_DB})'}")
-    print("ground truth  : NONE (evaluation is CheckV, post-binning)")
+    # A mock community gets its labels from Mock_Data's phase 3, after this.
+    print("ground truth  : " + ("added by Mock_Data/3_label_from_references.py"
+                                if IS_MOCK else
+                                "NONE (evaluation is CheckV, post-binning)"))
     print(f"reads         : {READS_DIR}")
     print(f"work dir      : {MWORK}")
     print(f"output dir    : {MOUT}")
@@ -1921,7 +1932,8 @@ def main() -> int:
         # THE flag that separates this from a simulated dataset: there is no
         # reference, no strain map and no genome_label, so nothing downstream
         # may score it against truth. Evaluation is CheckV, after binning.
-        "dataset_type": "real_sequencing", "has_ground_truth": False,
+        "dataset_type": DATASET_TYPE,
+        "has_ground_truth": False,
         "evaluation": "checkv", "reference": None,
         "read_type": READ_TYPE, "minimap_preset": MINIMAP_PRESET,
         "mean_read_length": (round(observed_read_length, 2)
@@ -2015,7 +2027,8 @@ def main() -> int:
 
     manifest = {
         "run": RUN_NAME, "dataset": DATASET, "study": STUDY,
-        "dataset_type": "real_sequencing", "has_ground_truth": False,
+        "dataset_type": DATASET_TYPE,
+        "has_ground_truth": False,
         "evaluation": "checkv", "accessions": ACCESSIONS,
         "assembly_mode": "coassembly", "read_type": READ_TYPE, "read_qc": "none",
         "source": SOURCE,
@@ -2046,7 +2059,9 @@ def main() -> int:
     print("DONE")
     print(f"  graph    -> {graph_path}")
     print(f"  manifest -> {os.path.join(MOUT, 'manifest.json')}")
-    print("  no ground truth: evaluate bins with 4_checkv_evaluate.py")
+    print("  next: " + ("Mock_Data/3_label_from_references.py, for the labels"
+                          if IS_MOCK else
+                          "no ground truth; evaluate bins with 4_checkv_evaluate.py"))
     print("=" * 68)
     return 0
 

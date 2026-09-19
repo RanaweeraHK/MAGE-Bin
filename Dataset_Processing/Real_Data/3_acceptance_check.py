@@ -24,7 +24,8 @@ torch.serialization.add_safe_globals([Data])
 # repo root is two levels up.
 HERE = Path(__file__).resolve().parent
 REPO_HOME = HERE.parent.parent
-REGISTRY = HERE / "datasets.tsv"
+# Overridable for the same reason as phase 2 - see the note there.
+REGISTRY = Path(os.environ.get("VB_REGISTRY") or HERE / "datasets.tsv")
 
 
 COHORT_MIN_BP = 2000

@@ -1,104 +1,263 @@
 # MAGE-Bin
 
-MAGE-Bin is a label-free viral metagenomic binner that combines standardized
-tetranucleotide composition, multi-sample abundance, a masked graph
-autoencoder, and biologically filtered assembly-graph links. Its encoder learns
-a convex gate between the identity representation and graph messages. Neither
-ground-truth labels nor CheckV scores are used for training, model selection, or
-clustering.
+MAGE-Bin is a label-free method for viral metagenomic binning. It combines
+tetranucleotide composition, multi-sample abundance, statistical graph evidence,
+and biologically supported assembly-graph links to group viral contigs into bins.
 
-The installable implementation in `src/magebin/` is the source of truth. The
-notebooks under `Notebooks/` record the research process and previous
-experiments; they are not imported at runtime.
+MAGE-Bin uses self-supervised masked reconstruction to learn contig
+representations. A learnable fusion gate controls how much graph information
+contributes to the final representation. Ground-truth genome labels and CheckV
+scores are not used during training, model selection, or clustering.
 
 ## Installation
 
-For development:
+MAGE-Bin requires Python 3.10 or later.
+
+Install the current release from PyPI:
 
 ```bash
-python -m pip install -e '.[test]'
+pip install magebin
+```
+
+Check the installation:
+
+```bash
 magebin --version
 magebin doctor
 ```
 
-MAGE-Bin is distributed under the MIT License; see `LICENSE`.
+### PyTorch
 
-## Input contract
+MAGE-Bin uses PyTorch and PyTorch Geometric. The standard installation above
+allows `pip` to resolve these dependencies automatically.
 
-The current CLI consumes the model-ready dataset contract produced by
-`Dataset_Processing/`. A dataset directory must contain:
+If you require a particular CPU or CUDA build of PyTorch, install the appropriate
+PyTorch build for your system before installing MAGE-Bin.
+
+## Quick start
+
+MAGE-Bin 0.1.0 operates on a model-ready dataset directory.
+
+A basic run is:
+
+```bash
+magebin bin /path/to/dataset \
+    --output /path/to/results
+```
+
+For example, to force CPU execution:
+
+```bash
+magebin bin /path/to/dataset \
+    --output /path/to/results \
+    --device cpu \
+    --seed 0
+```
+
+Run the following command to see all available options:
+
+```bash
+magebin bin --help
+```
+
+## Input
+
+MAGE-Bin 0.1.0 currently expects a preprocessed, model-ready dataset directory.
+
+The directory must contain:
 
 - `config.json`
-- `contig_metadata.tsv`, including `node_index`, `contig_id`, and `length`
-- `tnf_counts.npz`, including `names` and `counts` arrays
-- `viral_graph.pt` when assembly links are available
+- `contig_metadata.tsv`
+- `tnf_counts.npz`
+- `viral_graph.pt` when assembly-graph information is available
 
-Coverage is resolved from `--coverage`, `<dataset>/coverage.csv`, the
-`coverage_csv` manifest field, or `<work_dir>/coverage.csv`, in that order.
+`contig_metadata.tsv` must include:
 
-## CLI
+- `node_index`
+- `contig_id`
+- `length`
+
+`tnf_counts.npz` must contain the `names` and `counts` arrays used for
+tetranucleotide composition.
+
+### Coverage
+
+Coverage can be supplied explicitly:
 
 ```bash
-magebin bin Data/Processed_data/<dataset> --output Outputs/magebin/<dataset>
+magebin bin /path/to/dataset \
+    --coverage /path/to/coverage.csv \
+    --output /path/to/results
 ```
 
-Useful reproducibility controls:
+When `--coverage` is not provided, MAGE-Bin searches for coverage information
+using the dataset configuration.
+
+The preprocessing workflow used to construct model-ready datasets is available
+in the `Dataset_Processing/` directory of the GitHub repository.
+
+> **Current limitation:** Version 0.1.0 does not yet take raw FASTA and read
+> files directly through the `magebin bin` command. Input must first be
+> converted to the model-ready dataset format.
+
+## Output
+
+MAGE-Bin writes its results to the directory specified with `--output`.
+
+The main outputs are:
+
+### `assignments.tsv`
+
+Contains the final contig-to-bin assignments, including:
+
+- `contig_id`
+- `bin_id`
+- contig `length`
+
+### `run.json`
+
+Records information about the run, including model parameters, learned fusion
+weights, graph statistics, timing information, and output summary.
+
+### `terminal_repeats.tsv`
+
+Stores cached terminal-repeat evidence when the required sequence information is
+available.
+
+## Method overview
+
+MAGE-Bin combines biological features and graph information in a self-supervised
+binning framework.
+
+The main steps are:
+
+1. **Biological feature construction**  
+   Tetranucleotide composition and multi-sample abundance are used to represent
+   each viral contig.
+
+2. **Statistical graph construction**  
+   Candidate relationships between contigs are evaluated using biological
+   similarity and empirical evidence calibration.
+
+3. **Assembly-graph support**  
+   Assembly relationships are treated as candidate links. An assembly link is
+   retained only when it has positive independent biological evidence from the
+   available composition and coverage information.
+
+4. **Self-supervised representation learning**  
+   A graph encoder is trained using masked feature reconstruction. No
+   ground-truth genome labels are required.
+
+5. **Learnable graph fusion**  
+   The encoder learns a convex gate between the identity representation and
+   graph-derived representation:
+
+   \[
+   z = \mathrm{normalize}\left((1-\alpha)z_{\mathrm{self}}
+   + \alpha z_{\mathrm{graph}}\right),
+   \]
+
+   where \(\alpha\) is learned during self-supervised training.
+
+6. **Unknown-K clustering**  
+   The learned representations and biological evidence are used to construct a
+   sparse clustering graph. MAGE-Bin determines the bins without requiring the
+   number of viral genomes to be specified beforehand.
+
+7. **Completeness protection**  
+   Terminal-repeat evidence can protect likely complete viral contigs from
+   inappropriate merging.
+
+Assembly edges are treated as biological evidence rather than ground truth.
+Supported assembly edges are added to the statistical graph without deleting or
+reweighting the existing statistical edges.
+
+CheckV is used only for downstream biological evaluation. CheckV scores are not
+used for training, model selection, graph construction, or clustering.
+
+## Reproducibility
+
+Important training parameters can be controlled from the command line.
+
+For example:
 
 ```bash
-magebin bin Data/Processed_data/<dataset> \
-  --output Outputs/magebin/<dataset> \
-  --device cpu \
-  --seed 0 \
-  --minimum-epochs 40 \
-  --maximum-epochs 100 \
-  --graph-update-interval 10
+magebin bin /path/to/dataset \
+    --output /path/to/results \
+    --device cpu \
+    --seed 0 \
+    --minimum-epochs 40 \
+    --maximum-epochs 100 \
+    --graph-update-interval 10
 ```
 
-Outputs are:
+Using a fixed seed and recording `run.json` helps reproduce individual runs.
 
-- `assignments.tsv`: `contig_id`, stable `bin_id`, and contig `length`
-- `run.json`: parameters, learned fusion weights, graph statistics, timing,
-  and output summary
-- `terminal_repeats.tsv`: cached reference-free completeness evidence when a
-  FASTA is available
+## Checking the installation
 
-## Testing
+MAGE-Bin includes a diagnostic command:
+
+```bash
+magebin doctor
+```
+
+This reports the installed Python dependencies and the availability of optional
+external tools.
+
+## Development
+
+Clone the repository:
+
+```bash
+git clone https://github.com/RanaweeraHK/MAGE-Bin.git
+cd MAGE-Bin
+```
+
+Install MAGE-Bin with the development and testing dependencies:
+
+```bash
+python -m pip install -e '.[test]'
+```
+
+Run the automated checks:
 
 ```bash
 python -m ruff check src tests
 python -m pytest
+```
+
+Build and validate the distributions:
+
+```bash
 python -m build
 python -m twine check --strict dist/*
 ```
 
-Tests cover numerical utilities, graph invariants, assembly-edge fusion,
-learnable-gate behavior, completeness gating, metrics, CLI behavior, and a tiny
-end-to-end model run. Full biological benchmarks and CheckV evaluation remain
-separate from pull-request tests because they require large datasets and
-external databases.
+The automated tests cover numerical utilities, graph construction,
+assembly-edge integration, learnable fusion behavior, completeness gating,
+metrics, CLI behavior, and a small end-to-end model run.
 
-## Design boundaries
+Large biological benchmarks and CheckV evaluations are kept separate from the
+unit and integration tests because they require larger datasets and external
+databases.
 
-- Assembly edges are candidates, not truth. They are retained only when their
-  combined composition/coverage evidence is positive.
-- Supported assembly edges are unioned with statistical edges without deleting
-  or reweighting the statistical graph.
-- The fusion gate is learned during masked reconstruction and starts at the
-  notebook's original 0.10 graph-to-identity ratio.
-- Complete-looking terminal-repeat contigs can be isolated from merging.
-- CheckV is a downstream evaluation tool and never participates in fitting.
+## Research code and notebooks
 
-## Publishing
+The installable MAGE-Bin implementation is maintained under `src/magebin/`.
 
-The GitHub workflows follow the pattern used by maintained metagenomic tools:
-pull requests run linting, tests, CLI smoke checks, and package builds; a
-semantic version tag such as `v0.1.0` builds the distributions, publishes them
-to PyPI through Trusted Publishing, and creates a GitHub release. Configure a
-protected `pypi` GitHub environment and the matching PyPI trusted publisher
-before creating a release tag.
+The `Notebooks/` directory contains research experiments and development
+notebooks. These notebooks are not required when MAGE-Bin is installed from
+PyPI and are not imported by the runtime package.
 
-Bioconda submission comes after the first immutable PyPI release. Copy the
-recipe template under `packaging/bioconda/` into a fork of
-`bioconda-recipes`, replace its source checksum and maintainer placeholder, run
-`bioconda-utils lint`, and open a pull request there. The template deliberately
-cannot be submitted until this project has a released source archive.
+Dataset preparation and benchmark-related scripts are maintained separately
+from the installable model.
+
+## Citation
+
+If you use MAGE-Bin in research, please cite the MAGE-Bin paper.
+
+The full citation and DOI will be added here when the paper becomes available.
+
+## License
+
+MAGE-Bin is distributed under the MIT License. See `LICENSE` for details.

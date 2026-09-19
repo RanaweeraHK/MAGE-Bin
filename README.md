@@ -26,9 +26,6 @@ magebin --version
 magebin doctor
 ```
 
-For the `magebin run` changes on the GitHub main branch before the next PyPI
-release, install this checkout with `python -m pip install -e .`.
-
 ### PyTorch
 
 MAGE-Bin uses PyTorch and PyTorch Geometric. The standard installation above

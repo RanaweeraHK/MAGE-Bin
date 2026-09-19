@@ -146,3 +146,48 @@ def test_run_requires_usable_gfa(tmp_path):
         prepare_dataset(
             fasta, coverage, graph, tmp_path / "empty-graph", min_contig_length=2000
         )
+
+
+def test_length_filter_keeps_graph_indices_aligned(tmp_path):
+    """Graph indices must follow the retained contigs after length filtering."""
+
+    fasta = tmp_path / "contigs.fasta"
+    sequences = {
+        "short_0": "ACGT" * 250,      # 1000 bp: removed
+        "long_0": "ACGT" * 625,       # 2500 bp: retained
+        "short_1": "AGCT" * 375,      # 1500 bp: removed
+        "long_1": "AGCT" * 625,       # 2500 bp: retained
+        "long_2": "ATGC" * 625,       # 2500 bp: retained
+    }
+    fasta.write_text(
+        "".join(f">{name}\n{sequence}\n" for name, sequence in sequences.items())
+    )
+
+    coverage = tmp_path / "coverage.tsv"
+    pd.DataFrame(
+        {
+            "contig": list(sequences),
+            "sample_a": [1, 100, 2, 90, 80],
+            "sample_b": [1, 2, 1, 95, 85],
+        }
+    ).to_csv(coverage, sep="\t", index=False)
+
+    graph = tmp_path / "assembly_graph.gfa"
+    graph.write_text(
+        "H\tVN:Z:1.0\n"
+        + "".join(f"S\t{name}\t*\n" for name in sequences)
+        + "L\tlong_0\t+\tlong_1\t+\t0M\n"
+        + "L\tlong_1\t+\tlong_2\t+\t0M\n"
+    )
+
+    dataset_dir = prepare_dataset(
+        fasta,
+        coverage,
+        graph,
+        tmp_path / "filtered",
+        min_contig_length=2000,
+    )
+    dataset = load_binning_dataset(dataset_dir, MageBinConfig())
+
+    assert dataset.contig_ids == ["long_0", "long_1", "long_2"]
+    assert load_assembly_edges(dataset).tolist() == [[0, 1], [1, 2]]

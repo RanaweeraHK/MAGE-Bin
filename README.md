@@ -36,7 +36,7 @@ PyTorch build for your system before installing MAGE-Bin.
 
 ## Quick start
 
-MAGE-Bin 0.1.0 operates on a model-ready dataset directory.
+MAGE-Bin operates on a model-ready dataset directory.
 
 A basic run is:
 
@@ -62,7 +62,7 @@ magebin bin --help
 
 ## Input
 
-MAGE-Bin 0.1.0 currently expects a preprocessed, model-ready dataset directory.
+MAGE-Bin currently expects a preprocessed, model-ready dataset directory.
 
 The directory must contain:
 
@@ -96,7 +96,7 @@ using the dataset configuration.
 The preprocessing workflow used to construct model-ready datasets is available
 in the `Dataset_Processing/` directory of the GitHub repository.
 
-> **Current limitation:** Version 0.1.0 does not yet take raw FASTA and read
+> **Current limitation:** this version does not yet take raw FASTA and read
 > files directly through the `magebin bin` command. Input must first be
 > converted to the model-ready dataset format.
 
@@ -150,14 +150,7 @@ The main steps are:
 
 5. **Learnable graph fusion**  
    The encoder learns a convex gate between the identity representation and
-   graph-derived representation:
-
-   \[
-   z = \mathrm{normalize}\left((1-\alpha)z_{\mathrm{self}}
-   + \alpha z_{\mathrm{graph}}\right),
-   \]
-
-   where \(\alpha\) is learned during self-supervised training.
+   graph-derived representation.
 
 6. **Unknown-K clustering**  
    The learned representations and biological evidence are used to construct a

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,7 +10,10 @@ if TYPE_CHECKING:
     from .pipeline import BinningResult, run_binning
 
 __all__ = ["BinningResult", "MageBinConfig", "run_binning"]
-__version__ = "0.1.0"
+try:
+    __version__ = version("magebin")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 
 def __getattr__(name: str):

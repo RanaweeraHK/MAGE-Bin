@@ -8,10 +8,6 @@ from dataclasses import asdict, dataclass
 @dataclass(frozen=True, slots=True)
 class MageBinConfig:
     """All reproducibility-sensitive MAGE-Bin parameters.
-
-    Defaults reproduce the learnable-gate notebook experiment. The initial
-    graph weight of ``1 / 11`` is exactly equivalent to the prototype's
-    ``identity + 0.10 * graph`` ratio after convex normalization.
     """
 
     min_contig_length: int = 2_000

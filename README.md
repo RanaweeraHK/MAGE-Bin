@@ -351,10 +351,7 @@ truth-based: a bin must have at least 90% reference completeness and at most 5%
 contamination. It is separate from CheckV quality categories. Real datasets have no
 ground-truth assignments and are evaluated with CheckV.
 
-The numerical sources are
-[`comparison_simulated.csv`](Outputs/comparison_simulated.csv),
-[`comparison_real.csv`](Outputs/comparison_real.csv), and
-[`comparison_mock.csv`](Outputs/comparison_mock.csv).
+
 
 ### Simulated datasets
 

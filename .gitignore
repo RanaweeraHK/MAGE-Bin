@@ -4,6 +4,10 @@ Outputs/*
 !Outputs/comparison_real.csv
 !Outputs/comparison_simulated.csv
 !Outputs/plots/
+!Outputs/Images/
+Outputs/Images/*
+!Outputs/Images/model-architecture.png
+!Outputs/Images/ssl-gnn.png
 *.lock
 
 # Python

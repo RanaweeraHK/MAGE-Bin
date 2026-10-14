@@ -241,13 +241,11 @@ def propose_training_graph(
             )
         )
     else:
-        reference = (
-            attributes
-            if len(attributes) <= config.exact_knn_limit
-            else normalize_rows(
-                np.concatenate(
-                    (attributes, config.learned_view_weight * embedding), axis=1
-                )
+        # One rule at every cohort size: the biological attributes anchor the
+        # rebuilt graph and the learned embedding adds a small, weighted view.
+        reference = normalize_rows(
+            np.concatenate(
+                (attributes, config.learned_view_weight * embedding), axis=1
             )
         )
         statistical_edges, prior = build_positive_evidence_graph(
